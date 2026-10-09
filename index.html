@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07111f">
+<title>Tiempo Extra Radar</title>
+<style>
+:root{--bg:#07111f;--card:#0d1b2d;--line:#22334a;--txt:#f5f7fb;--muted:#9eacc0;--accent:#19d37e;--danger:#ff4d5d;--warn:#ffb020;--blue:#4da3ff}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#07111f,#050b14);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+header{position:sticky;top:0;z-index:10;background:rgba(7,17,31,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding:16px}
+h1{margin:0;font-size:24px}.sub{color:var(--muted);font-size:13px;margin-top:4px}
+.wrap{max-width:900px;margin:auto;padding:14px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.btn,.select{border:1px solid var(--line);background:#0b1727;color:var(--txt);border-radius:12px;padding:11px 13px;font-weight:700}.btn{cursor:pointer}.btn.primary{background:var(--accent);color:#03150d;border-color:var(--accent)}.btn:disabled{opacity:.5}
+.status{padding:10px 12px;border-radius:12px;background:#0b1727;border:1px solid var(--line);color:var(--muted);font-size:13px;margin-bottom:12px}
+.grid{display:grid;gap:12px}.news{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}.top{display:flex;justify-content:space-between;gap:8px;align-items:start}.tag{font-size:11px;font-weight:800;padding:5px 8px;border-radius:999px;background:#14263e;color:#b9d8ff}.tag.urgent{background:#3a141b;color:#ff9ba4}.tag.confirmed{background:#103222;color:#73e5a7}.tag.rumor{background:#382c10;color:#ffd477}.tag.dev{background:#2b1e10;color:#ffbd6a}
+.title{font-size:18px;font-weight:800;line-height:1.25;margin:10px 0 7px}.meta{font-size:12px;color:var(--muted);line-height:1.5}.source{color:#79baff;text-decoration:none}.actions{display:flex;gap:8px;margin-top:12px}.actions .btn{flex:1}.hidden{display:none}
+.panel{margin-top:14px;background:#091525;border:1px solid var(--line);border-radius:16px;padding:14px}.panel h2{font-size:18px;margin:0 0 12px}.field{margin:10px 0}.label{font-size:12px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}.box{white-space:pre-wrap;background:#06101c;border:1px solid #1c2c41;border-radius:12px;padding:12px;line-height:1.5;font-size:14px}.copy{float:right;margin-top:-42px;margin-right:8px;border:1px solid var(--line);background:#12233a;color:#fff;border-radius:9px;padding:7px 9px;font-weight:700}.photo{width:100%;max-height:420px;object-fit:cover;border-radius:12px;border:1px solid var(--line);margin:8px 0}.small{font-size:11px;color:var(--muted)}
+footer{padding:28px 0;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+<h1>⚽ Tiempo Extra Radar</h1>
+<div class="sub">Noticias de fútbol → verificación → foto → contenido listo para Reel</div>
+</div></header>
+<main class="wrap">
+<div class="toolbar">
+<button class="btn primary" id="refresh">🔄 Buscar noticias</button>
+<select class="select" id="filter"><option value="all">Todas</option><option value="urgent">Urgentes</option><option value="injury">Lesiones</option><option value="transfer">Fichajes</option><option value="controversy">Controversias</option></select>
+</div>
+<div class="status" id="status">Preparando radar…</div>
+<div class="grid" id="news"></div>
+<div id="detail"></div>
+<footer>V5 · Para automatización 24/7, el servidor debe permanecer activo. Las fotos deben usarse respetando sus licencias.</footer>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+let all=[];
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function tagClass(x){return x==='URGENTE'?'urgent':x==='CONFIRMADO'?'confirmed':x==='RUMOR'?'rumor':'dev'}
+function render(){
+ const f=$('#filter').value;
+ const list=all.filter(n=>f==='all'||n.category===f);
+ $('#news').innerHTML=list.length?list.map(n=>`
+ <article class="news">
+  <div class="top"><span class="tag ${tagClass(n.status)}">${esc(n.status)}</span><span class="small">${esc(n.timeAgo||'')}</span></div>
+  <div class="title">${esc(n.headline)}</div>
+  <div class="meta">${esc(n.summary||'')}<br>Fuente: <a class="source" href="${esc(n.sourceUrl)}" target="_blank" rel="noopener">${esc(n.sourceName||'Abrir fuente')}</a></div>
+  <div class="actions"><button class="btn primary" onclick="generate(${JSON.stringify(n.id)})">✨ Crear contenido</button></div>
+ </article>`).join(''):'<div class="status">No hay noticias en este filtro.</div>';
+}
+async function load(){
+ $('#refresh').disabled=true; $('#status').textContent='🔎 Buscando noticias recientes…';
+ try{
+  const r=await fetch('/api/news'); const d=await r.json();
+  if(!r.ok) throw new Error(d.error||'Error');
+  all=d.items||[]; render();
+  $('#status').textContent=`✅ ${all.length} noticias detectadas · actualización automática cada 5 minutos`;
+ }catch(e){$('#status').textContent='❌ '+e.message+' · Comprueba que el servidor esté activo.'}
+ finally{$('#refresh').disabled=false}
+}
+async function generate(id){
+ const n=all.find(x=>x.id===id); if(!n)return;
+ $('#detail').innerHTML='<div class="panel">⏳ Analizando la noticia, buscando foto y preparando contenido…</div>';
+ try{
+  const r=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(n)});
+  const d=await r.json(); if(!r.ok)throw new Error(d.error||'No se pudo generar');
+  const x=d.content;
+  $('#detail').innerHTML=`<section class="panel">
+   <h2>📦 Paquete listo para publicar</h2>
+   ${field('🚨 TITULAR',x.title)}
+   ${field('🎙️ NARRACIÓN',x.narration)}
+   ${d.photo?`<div class="field"><div class="label">📸 FOTO DEL TEMA</div><img class="photo" src="${esc(d.photo.url)}"><div class="small">${esc(d.photo.credit||'Fuente de imagen')}</div></div>`:''}
+   ${field('✨ PROMPT PARA MEJORAR LA FOTO',x.imagePrompt)}
+   ${field('📝 DESCRIPCIÓN PARA REEL',x.description)}
+   ${field('#️⃣ HASHTAGS',x.hashtags)}
+  </section>`;
+  window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});
+ }catch(e){$('#detail').innerHTML=`<div class="panel">❌ ${esc(e.message)}</div>`}
+}
+function field(label,text){
+ const id='f'+Math.random().toString(36).slice(2);
+ setTimeout(()=>{const b=document.getElementById(id+'b');b.onclick=async()=>{await navigator.clipboard?.writeText(text);b.textContent='✅ Copiado';setTimeout(()=>b.textContent='📋 Copiar',1200)}},0);
+ return `<div class="field"><div class="label">${label}</div><div class="box">${esc(text)}</div><button class="copy" id="${id}b">📋 Copiar</button></div>`
+}
+$('#refresh').onclick=load; $('#filter').onchange=render;
+load(); setInterval(load,300000);
+</script>
+</body>
+</html>

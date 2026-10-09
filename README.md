@@ -1,0 +1,1 @@
+# Tiempo Extra Radar IA\n\nSube todos los archivos de este proyecto a GitHub manteniendo la carpeta public. En Render usa Build Command `npm install` y Start Command `npm start`. Consulta RSS de Google News; verifica siempre las fuentes y licencias antes de publicar.\n
